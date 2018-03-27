@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+	<title>Chat App</title>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+	<script src="/socket.io/socket.io.js"></script>
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+</head>
+<body>
+	<div class="container">
+		<div class="col-lg-4">
+
+			<div class="col-lg-12">
+				<input type="text" id="username" name="">
+				<input type="button" id="username_submit_btn" value="Set" class="btn">	
+			</div>
+			<div class="col-lg-12">
+				<div id="userslist" class="col-lg-12"></div>
+			</div>
+		</div>
+		<div class="col-lg-8">
+			<div id="chatWindow" class="col-lg-12"></div>
+		</div>
+	</div>
+	
+	<div class="container" style="position: absolute;bottom: 0px">
+		<div id="typingUsers" class="col-lg-12"></div>
+		<div class="col-lg-11 col-xs-11">
+			<input type="text" class="form-control" id="chatBox" value="">
+		</div>
+		<div class="col-lg-1 col-xs-1">
+			<input type="button" value="Send" class="btn btn-primary" id="sendMessage">
+		</div>
+	</div>
+</body>
+</html>
+<script type="text/javascript">
+	$(function(){
+		var socket = io.connect();
+		var clientID = Math.ceil(Math.random()*100);
+		var userRegistered = false;
+
+		$('#username_submit_btn').click(function(){
+			socket.emit('new user',$('#username').val(),function(data){
+				if(data){
+					userRegistered = true;
+					$('#username').attr('readonly',true);
+				}
+			});
+		});
+
+		$('#sendMessage').click(function(e){
+			e.preventDefault();
+
+			if($('#chatBox').val()!=''){
+				if(userRegistered){
+					socket.emit('new message',{
+						clientID: clientID,
+						user: $('#username').val(),
+						msg:$('#chatBox').val()
+					});
+					$('#chatBox').val('');
+				}else{
+					alert('User Not Registered');
+					$('#username').attr('readonly',false);
+				}
+			}
+
+		});
+
+		socket.on('new message',function(data){
+			if(data.clientID==clientID){
+				$('#chatWindow').append('<div class="row"><div class="well" style="float: right"><strong>'+data.user+'</strong>: '+data.msg+'</div></div>');	
+			}else{
+				$('#chatWindow').append('<div class="row"><div class="well" style="float: left"><strong>'+data.user+'</strong>: '+data.msg+'</div></div>');
+			}
+			
+		});
+
+		socket.on('get users',function(data){
+			$('#userslist').html('');
+			for(x in data){
+				$('#userslist').append('<div class="row">'+data[x]+'</div>');
+			}
+		});
+
+		// Typing Event
+		$('#chatBox').on('keyup',function(){
+			if($(this).val()!=''){
+				socket.emit('typing',{
+					istyping: true,
+					user: $('#username').val()
+				});
+			}
+		});
+
+		socket.on('typing users',function(data){
+			for(name in data){
+				if(data[name]!=$('#username').val()){
+					$('#typingUsers').html('<div class="row">'+data[name]+' is Typing...</div>');		
+				}
+			}
+			setTimeout(function(){
+				$('#typingUsers').html('');
+				socket.emit('typing',{
+					istyping: false,
+					user: $('#username').val()
+				});
+			},5000);
+			
+		});
+	});
+</script>
